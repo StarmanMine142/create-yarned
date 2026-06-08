@@ -1,0 +1,255 @@
+plugins {
+    id("idea")
+    id("eclipse")
+    id("maven-publish")
+    id("net.kyori.blossom") version "2.2.0" // https://github.com/KyoriPowered/blossom
+    id("dev.ithundxr.silk") version "1.0.1" // https://github.com/ithundxr/silk
+    id("fabric-loom") version "1.16-SNAPSHOT"
+    id("me.modmuss50.mod-publish-plugin") version "1.1.0" // https://github.com/modmuss50/mod-publish-plugin
+}
+
+boolean dev = System.getenv("RELEASE") == null || System.getenv("RELEASE") == "false"
+String buildNumber = System.getenv("BUILD_NUMBER")
+String gitHash = calculateGitHash() + (hasUnstaged() ? "-modified" : "")
+
+group = "com.simibubi.create"
+version = mod_version + (dev && buildNumber != null ? "-${buildNumber}" : "")
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+println("Java: ${System.getProperty("java.version")}, JVM: ${System.getProperty("java.vm.version")} (${System.getProperty("java.vendor")}), Arch: ${System.getProperty("os.arch")}")
+
+idea {
+    module {
+        downloadJavadoc = true
+        downloadSources = true
+    }
+}
+
+loom {
+    accessWidenerPath = file("src/main/resources/create.accesswidener")
+
+    runs {
+        client {
+            client()
+            setConfigName("Client")
+            ideConfigGenerated = true
+            runDir = "run"
+        }
+
+        server {
+            server()
+            setConfigName("Server")
+            ideConfigGenerated = true
+            runDir = "run/server"
+        }
+    }
+}
+
+repositories {
+    maven { url = "https://maven.createmod.net" } // Ponder, Flywheel
+    maven { url = "https://maven.ithundxr.dev/snapshots" } // Registrate
+    maven { url = "https://maven.blamejared.com" } // JEI, Vazkii's Mods
+    maven { url = 'https://maven.ladysnake.org/releases'} // Trinkets
+    maven { url = 'https://maven.terraformersmc.com/' } // TerraformersMC
+    maven { url = "https://maven.squiddev.cc" } // CC: Tweaked
+    maven { url = "https://www.cursemaven.com" }
+    maven { url = "https://api.modrinth.com/maven" }
+    maven { url = "https://maven.ftb.dev/releases" } // FTB Mods
+    maven { url = "https://maven.architectury.dev" } // Arch API
+    maven { url = "https://maven.parchmentmc.org" }
+    maven { url = "https://maven.caffeinemc.net/releases"  } // Sodium
+    // NeoForge config api port, needed by ponder
+    maven { url = "https://raw.githubusercontent.com/Fuzss/modresources/main/maven" }
+    maven { url = 'https://maven.blamejared.com' }
+    maven { url = "https://chocolateminecraft.com/maven" } // Xaero
+}
+
+configurations {
+    localImplementation
+
+    implementation.extendsFrom(localImplementation)
+
+    runtimeOnly.extendsFrom(localRuntimeOnly)
+}
+
+dependencies {
+    minecraft("com.mojang:minecraft:${minecraft_version}")
+    mappings loom.layered {
+        officialMojangMappings()
+        parchment("org.parchmentmc.data:parchment-1.21.1:${parchment_version}")
+    }
+    modImplementation("net.fabricmc:fabric-loader:${loader_version}")
+
+    // Required dependencies
+    modApi("com.tterrag.registrate:Registrate:$registrate_version")
+
+    compileOnly("dev.engine-room.flywheel:flywheel-fabric-api-$minecraft_version:$flywheel_version")
+    modRuntimeOnly("dev.engine-room.flywheel:flywheel-fabric-$minecraft_version:$flywheel_version")
+
+    modApi("net.createmod.ponder:ponder-fabric:$ponder_version+mc$minecraft_version")
+
+    // Local dependencies - not published to consumers
+    modRuntimeOnly("dev.engine-room.vanillin:vanillin-fabric-$minecraft_version:$vanillin_version")
+
+    modImplementation("mezz.jei:jei-$minecraft_version-fabric:$jei_version")
+
+    compileOnly("net.caffeinemc:sodium-fabric:$sodium_version")
+
+    if (cc_tweaked_enable.toBoolean()) {
+        compileOnly("cc.tweaked:cc-tweaked-$minecraft_version-core-api:$cc_tweaked_version")
+        compileOnly("cc.tweaked:cc-tweaked-$minecraft_version-fabric-api:$cc_tweaked_version")
+        modRuntimeOnly("cc.tweaked:cc-tweaked-$minecraft_version-fabric:$cc_tweaked_version")
+    }
+
+    compileOnly("maven.modrinth:farmers-delight:${farmers_delight_version}")
+    if (farmers_delight_enable.toBoolean()) {
+        modImplementation("maven.modrinth:farmers-delight:${farmers_delight_version}")
+    }
+
+    modImplementation "dev.emi:trinkets:${trinkets_version}"
+
+    modRuntimeOnly("dev.architectury:architectury-fabric:13.0.8")
+    modImplementation("dev.ftb.mods:ftb-chunks-fabric:2101.1.1")
+    modImplementation("dev.ftb.mods:ftb-teams-fabric:2101.1.0")
+    modImplementation("dev.ftb.mods:ftb-library-fabric:2101.1.3")
+
+    modImplementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.82+fabric")
+    modImplementation("info.journeymap:journeymap-api-fabric:2.0.0-1.21.1") {
+        exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+    }
+
+    compileOnly("xaero.lib:xaerolib-fabric-1.21:1.0.42")
+    compileOnly("curse.maven:xaeros-world-map-317780:7401095")
+}
+
+sourceSets.main {
+    java {
+        if (!cc_tweaked_enable.toBoolean()) {
+            exclude("com/simibubi/create/compat/computercraft/implementation/**")
+        }
+    }
+
+    resources {
+        srcDir("src/generated/resources")
+        exclude(".cache/")
+        exclude("data/create/.wiki")
+    }
+
+    blossom.javaSources {
+        property("version", mod_version)
+        property("gitCommit", gitHash.toString())
+    }
+}
+
+jar {
+    from("LICENSE.md") {
+        rename { "${mod_name}_${it}" }
+    }
+}
+
+tasks.withType(Jar).configureEach {
+    manifest.attributes([
+        "Git-Hash": gitHash
+    ])
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+}
+
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [
+        "mod_version"           : mod_version,
+        "mod_id"                : mod_id,
+        "mod_name"              : mod_name,
+        "mod_author"            : mod_author,
+        "mod_description"       : mod_description,
+        "mod_license"           : mod_license,
+        "minecraft_version"     : minecraft_version,
+        "ponder_version"        : ponder_version,
+        "flywheel_version_range": flywheel_version_range,
+        "loader_version"        : loader_version
+    ]
+    inputs.properties(replaceProperties)
+    expand(replaceProperties)
+    from(rootProject.file("fabric.mod.json"))
+    into("build/generated/sources/modMetadata")
+}
+
+sourceSets.main.resources.srcDir(generateModMetadata)
+
+publishing {
+    repositories {
+        maven {
+            url = "https://maven.createmod.net"
+            credentials {
+                username = providers.environmentVariable("MAVEN_USERNAME").orNull
+                password = providers.environmentVariable("MAVEN_PASSWORD").orNull
+            }
+        }
+    }
+
+    publications {
+        register("mavenJava", MavenPublication) {
+            from(components.java)
+        }
+    }
+}
+
+publishMods {
+    file = jar.archiveFile
+    changelog = silk.changelog
+    type = STABLE
+    version = "$mod_version+mc$minecraft_version"
+    displayName = "$mod_name $mod_version for mc$minecraft_version"
+    modLoaders.add("fabric")
+
+//    curseforge {
+//        accessToken = providers.environmentVariable("CURSEFORGE_TOKEN")
+//        projectId = "328085"
+//        minecraftVersions.add(minecraft_version)
+//    }
+//
+//    modrinth {
+//        accessToken = providers.environmentVariable("MODRINTH_TOKEN")
+//        projectId = "LNytGWDc"
+//        minecraftVersions.add(minecraft_version)
+//    }
+//
+//    github {
+//        accessToken = providers.environmentVariable("GITHUB_TOKEN")
+//        repository = "Creators-of-Create/Create"
+//        commitish = gitHash
+//        tagName = "mc$minecraft_version-$mod_version"
+//        file.unset()
+//        file.unsetConvention()
+//
+//        allowEmptyFiles = true
+//    }
+}
+
+String calculateGitHash() {
+    try {
+        ExecOutput output = providers.exec {
+            commandLine("git", "rev-parse", "HEAD")
+        }
+        return output.standardOutput.asText.get().trim()
+    } catch (Throwable ignored) {
+        return "unknown"
+    }
+}
+
+boolean hasUnstaged() {
+    try {
+        ExecOutput output = providers.exec {
+            commandLine("git", "status", "--porcelain")
+        }
+        String result = output.standardOutput.asText.get().replace("/M gradlew(\\.bat)?/", "").trim()
+        if (!result.isEmpty())
+            println("Found stageable results:\n ${result}\n")
+        return !result.isEmpty()
+    } catch (Throwable ignored) {
+        return false
+    }
+}

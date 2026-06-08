@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${mod_version}",
+  "name": "${mod_name}",
+  "description": "${mod_description}",
+  "authors": [
+    "${mod_author}"
+  ],
+  "contact": {
+    "issues": "https://github.com/Creators-of-Create/Create/issues"
+  },
+  "license": "${mod_license}",
+  "icon": "icon.png",
+  "environment": "*",
+  "mixins": [
+    "${mod_id}.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.14.0",
+    "minecraft": "${minecraft_version}",
+    "flywheel": "${flywheel_version_range}",
+    "ponder": ">=${ponder_version}"
+  },
+  "suggests": {
+    "sodium": ">=0.6.9",
+    "lithium": ">=0.14.7",
+    "journeymap": ">=1.21.1-6.0.0-beta.46",
+    "xaeroworldmap": ">=1.40.2"
+  },
+  "breaks": {
+    "radium": "*",
+    "palladium": "*"
+  }
+}

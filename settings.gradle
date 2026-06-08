@@ -1,0 +1,20 @@
+pluginManagement {
+    repositories {
+        mavenLocal()
+        gradlePluginPortal()
+        maven{ url = "https://maven.fabricmc.net/"}
+
+    }
+}
+
+if (file("Ponder").exists()) {
+    includeBuild(".")
+    includeBuild("Ponder") {
+        dependencySubstitution {
+            substitute(module("net.createmod.ponder:ponder-fabric")).using(project(":neoforge"))
+            substitute(module("net.createmod.ponder:ponder-common")).using(project(":common"))
+        }
+    }
+}
+
+rootProject.name = "$mod_id-$minecraft_version"
